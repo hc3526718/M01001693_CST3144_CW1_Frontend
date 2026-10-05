@@ -18,7 +18,7 @@
             <i class="fa-solid fa-arrow-left" v-if="currentPage !== 'lessons'" v-on:click="currentPage = 'lessons'"></i>
             <h1>After School Classes</h1>
             <p v-if="isGuest">Browsing as guest</p>
-            <i class="fa-solid fa-shopping-cart" v-on:click="currentPage = 'cart'"></i>
+            <i class="fa-solid fa-shopping-cart" v-bind:disabled="cartCount === 0" v-on:click="currentPage = 'cart'"></i>
             <span v-if="cartCount">({{ cartCount }})</span>
             <p v-if="loggedInUser && isGuest === false">Logged in as {{ loggedInUser }}</p>
             <button v-on:click="logout">Log out</button>
@@ -69,10 +69,10 @@
                     <button v-on:click="selectedLesson = lesson; currentPage = 'lesson-details'">
                         View Lesson
                     </button>
-                    <button v-on:click="addToCart(lesson)" v-bind:disabled="lesson.space <= 0">
+                    <button v-on:click="addToCart(lesson)" v-bind:disabled="!canAddToCart(lesson)">
                         Add to Cart
                     </button>
-                    <p class="no-space" v-if="lesson.space <= 0">No more space</p>
+                    <p class="no-space" v-if="!canAddToCart(lesson)">No more space</p>
                 </div>
             </div>
         </main>
@@ -83,10 +83,10 @@
                 <h2>{{ selectedLesson.topic }}</h2>
                 <p>£{{ selectedLesson.price }}</p>
                 <p>{{ selectedLesson.desc }}</p>
-                <button v-on:click="addToCart(selectedLesson)" v-bind:disabled="selectedLesson.space <= 0">
+                <button v-on:click="addToCart(selectedLesson)" v-bind:disabled="!canAddToCart(selectedLesson)">
                     Add to Cart
                 </button>
-                <p class="no-space" v-if="selectedLesson.space <= 0">No more space</p>
+                <p class="no-space" v-if="!canAddToCart(selectedLesson)">No more space</p>
                 <button v-on:click="currentPage = 'lessons'">
                     Back to Lessons
                 </button>
