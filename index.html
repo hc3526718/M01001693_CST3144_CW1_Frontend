@@ -14,13 +14,15 @@
     <div id="app">
 
         <!-- HEADER: shows who is using the app once they are past the welcome screens -->
-        <header v-if="currentPage === 'lessons' || currentPage === 'lesson-details' || currentPage === 'cart' || currentPage === 'checkout'">
+        <header
+            v-if="currentPage === 'lessons' || currentPage === 'lesson-details' || currentPage === 'cart' || currentPage === 'checkout' || currentPage === 'confirmation'">
             <i class="fa-solid fa-arrow-left" v-if="currentPage !== 'lessons'" v-on:click="currentPage = 'lessons'"></i>
             <h1>After School Classes</h1>
             <p v-if="isGuest">Browsing as guest</p>
-            <i class="fa-solid fa-shopping-cart" v-bind:disabled="cartCount === 0" v-on:click="currentPage = 'cart'"></i>
-            <span v-if="cartCount">({{ cartCount }})</span>
             <p v-if="loggedInUser && isGuest === false">Logged in as {{ loggedInUser }}</p>
+            <i class="fa-solid fa-shopping-cart" v-bind:disabled="cartCount === 0"
+                v-on:click="currentPage = 'cart'"></i>
+            <span v-if="cartCount">({{ cartCount }})</span>
             <button v-on:click="logout">Log out</button>
         </header>
 
@@ -95,22 +97,43 @@
 
         <section v-else-if="currentPage === 'cart'" class="cart">
             <h2>Your Cart</h2>
+            <p v-if="cartCount > 0">You have {{ cartCount }} item(s) in your cart.</p>
             <p v-if="cartCount === 0">Your cart is empty.</p>
-            <ul v-else>
-                <li v-for="item in cartSummary" :key="item.lesson.id">
-                    ID: {{ item.lesson.id }} | Lesson: {{ item.lesson.topic }} | Price: £{{ item.lesson.price }} | Quantity: {{ item.quantity }}
-                </li>
-            </ul>
+            <div class="lesson-grid">
+                <div class="lesson-card" v-for="item in cartSummary" v-bind:key="item.lesson.id">
+                    <img v-bind:src="'images/' + item.lesson.image" v-bind:alt="item.lesson.topic">
+                    <h3>{{ item.lesson.topic }}</h3>
+                    <p>Location: {{ item.lesson.location }}</p>
+                    <p>Price: £{{ item.lesson.price }}</p>
+                    <p>Quantity: {{ item.quantity }}</p>
+                    <button v-on:click="removeFromCart(item.lesson)">
+                        Remove Item
+                    </button>
+                </div>
+            </div>
+            <h3 v-if="cartCount > 0">Total: £{{ cartSummary.reduce((total, item) => total + (item.lesson.price *
+                item.quantity), 0) }}</h3>
             <button v-if="cartCount > 0" v-on:click="currentPage = 'checkout'">Proceed to Checkout</button>
-            <p v-if="cartCount > 0">Total: £{{ cartSummary.reduce((total, item) => total + item.lesson.price * item.quantity, 0) }}</p>
-            <button v-if="cartCount > 0" v-on:click="cart = []; lessons.forEach(lesson => lesson.space = 5); currentPage = 'lessons'">Clear Cart</button>
             <button v-on:click="currentPage = 'lessons'">Continue Shopping</button>
         </section>
 
         <section v-else-if="currentPage === 'checkout'" class="checkout">
             <h2>Checkout</h2>
-            <p>Thank you for your purchase!</p>
+            <textarea required v-model="checkoutName" class="form-control" placeholder="Name"></textarea>
+            <textarea required v-model="checkoutPhone" class="form-control" placeholder="Phone Number"></textarea>
+            <textarea required v-model="checkoutAddress" class="form-control" placeholder="Address"></textarea>
+            <h3>Order Total: £{{ cartSummary.reduce((total, item) => total + (item.lesson.price * item.quantity), 0) }}</h3>
+            <button :disabled="!isFormValid()" v-on:click="orderPlaced" v-on:click="currentPage = 'confirmation'">Place Order</button>
+            <button v-on:click="currentPage = 'cart'">Back to Cart</button>
             <button v-on:click="currentPage = 'lessons'">Continue Shopping</button>
+        </section>
+
+        <section v-else-if="currentPage === 'confirmation'" class="confirmation">
+            <h2>Order Confirmed!</h2>
+            <p>Thank you for your order.</p>
+            <button v-on:click="currentPage = 'lessons'">
+                Continue Shopping
+            </button>
         </section>
     </div>
 
@@ -136,6 +159,10 @@
                     registerEmail: '',
                     registerPassword: '',
                     registerConfirm: '',
+
+                    checkoutName: '',
+                    checkoutPhone: '',
+                    checkoutAddress: '',
 
                     // accounts created this session (front end only until the back end has user routes)
                     users: [],
@@ -238,6 +265,7 @@
             computed: {
                 // returns the first problem with the register form, or '' when everything is valid
                 // (regexes reused from TradeOff script.js lines 293-294)
+
                 registerProblem() {
                     const nameRegex = /^[A-Za-z ]+$/
                     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -248,6 +276,15 @@
                     if (this.registerPassword !== this.registerConfirm) return 'Passwords do not match'
                     return ''
                 },
+                removeFromCart() {
+                    return (lesson) => {
+                        const index = this.cart.findIndex(item => item.id === lesson.id)
+                        if (index !== -1) {
+                            this.cart.splice(index, 1)
+                            lesson.space++
+                        }
+                    }
+                },
                 cartCount() {
                     return this.cart.length || 0
                 },
@@ -257,7 +294,7 @@
                     const summary = []
                     this.cart.forEach(item => {
                         const existing = summary.find(entry => entry.lesson.id === item.id)
-                          if (existing) {
+                        if (existing) {
                             existing.quantity++
                         } else {
                             summary.push({ lesson: item, quantity: 1 })
@@ -272,6 +309,14 @@
                 // before anything on the details screen has been selected
                 // the same lesson can be added more than once (e.g. two children in the
                 // same class) until its spaces run out, then the button disables
+                orderPlaced() {
+                    this.cart = []
+                },
+                isFormValid() {
+                    return this.checkoutName.trim() !== '' &&
+                        this.checkoutPhone.trim() !== '' &&
+                        this.checkoutAddress.trim() !== ''
+                },
                 addToCart(lesson) {
                     if (!this.canAddToCart(lesson)) return
                     this.cart.push(lesson)
