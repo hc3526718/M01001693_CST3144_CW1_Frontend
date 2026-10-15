@@ -281,7 +281,7 @@
 
                 async fetchLessons() {
                     try {
-                        const response = await fetch("http://localhost:3000/lessons");
+                        const response = await fetch("http://localhost:5500/lessons");
 
                         if (!response.ok) {
                             throw new Error("Failed to retrieve lessons");
@@ -292,7 +292,6 @@
                         console.error("Error fetching lessons:", error);
                     }
                 },
-
             }
         })
         myApp.mount('#app')
