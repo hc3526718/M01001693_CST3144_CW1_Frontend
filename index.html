@@ -61,8 +61,28 @@
 
         <!-- LESSONS LANDING PAGE: one grid card per lesson using v-for -->
         <main v-else-if="currentPage === 'lessons'">
+            <label for="filter">Filter lessons:</label>
+            <select id="filter" v-model="selectedFilter">
+                <option value="All">All lessons</option>
+                <option value="Spaces Available">Spaces available</option>
+                <option value="Price < £30">Price under £30</option>
+                <option value="Price >= £30">Price £30 or more</option>
+            </select>
+
+            <label for="sortType">Sort lessons by:</label>
+            <select id="sortType" v-model="sortType">
+                <option value="price">Price</option>
+                <option value="availability">Available spaces</option>
+                <option value="location">Location</option>
+                <option value="subject">Subject</option>
+            </select>
+
+            <label>
+                <input type="checkbox" v-model="sortAscending">
+                Sort in increasing order
+            </label>
             <div class="lesson-grid">
-                <div class="lesson-card" v-for="lesson in lessons" v-bind:key="lesson.id">
+                <div class="lesson-card" v-for="lesson in sortedLessons" v-bind:key="lesson.id">
                     <img v-bind:src="'images/' + lesson.image" v-bind:alt="lesson.topic">
                     <h3>{{ lesson.topic }}</h3>
                     <p>Location: {{ lesson.location }}</p>
@@ -153,6 +173,14 @@
         const myApp = createApp({
             data() {
                 return {
+
+                    filterOptions: ['All', 'Spaces Available', 'Price < £20', 'Price >= £20'],
+                    selectedFilter: 'All',
+
+                    sortType: 'price',
+                    sortAscending: true,
+
+
                     // which screen is showing: 'welcome', 'login', 'register', 'lessons', 'lesson-details' or 'cart'
                     currentPage: 'welcome',
                     isGuest: false,
@@ -181,15 +209,57 @@
                     // lesson data (will later come from GET /lessons on the back end)
                     lessons: [],
 
-                    created() {
-                        this.fetchLessons();
-                    },
-
                 }
+            },
+            created() {
+                this.fetchLessons();
             },
             computed: {
                 // returns the first problem with the register form, or '' when everything is valid
                 // (regexes reused from TradeOff script.js lines 293-294)
+                sortedLessonsList: [],
+
+                sortedLessons() {
+                    // Start with a copy so we don't change the original lessons array.
+                    let result = [...this.lessons];
+
+                    // Apply the selected filter first.
+                    if (this.selectedFilter === 'Spaces Available') {
+                        result = result.filter(lesson => lesson.space > 0);
+                    } else if (this.selectedFilter === 'Price < £30') {
+                        result = result.filter(lesson => lesson.price < 30);
+                    } else if (this.selectedFilter === 'Price >= £30') {
+                        result = result.filter(lesson => lesson.price >= 30);
+                    }
+
+                    // Choose which lesson property to sort by.
+                    const properties = {
+                        price: 'price',
+                        availability: 'space',
+                        location: 'location',
+                        subject: 'topic'
+                    };
+
+                    const property = properties[this.sortType];
+
+                    // Sort the lessons in increasing or decreasing order.
+                    result.sort((a, b) => {
+                        let comparison;
+
+                        if (typeof a[property] === 'number') {
+                            comparison = a[property] - b[property];
+                        } else {
+                            comparison = String(a[property]).localeCompare(
+                                String(b[property])
+                            );
+                        }
+
+                        return this.sortAscending ? comparison : -comparison;
+                    });
+
+                    return result;
+                },
+
 
                 registerProblem() {
                     const nameRegex = /^[A-Za-z ]+$/
@@ -236,7 +306,7 @@
                 // same class) until its spaces run out, then the button disables
                 orderPlaced() {
                     this.cart = [],
-                    this.currentPage = 'confirmation'
+                        this.currentPage = 'confirmation'
                 },
                 isFormValid() {
                     return this.checkoutName.trim() !== '' &&
@@ -281,7 +351,7 @@
 
                 async fetchLessons() {
                     try {
-                        const response = await fetch("http://localhost:5500/lessons");
+                        const response = await fetch("http://localhost:3000/lessons");
 
                         if (!response.ok) {
                             throw new Error("Failed to retrieve lessons");
