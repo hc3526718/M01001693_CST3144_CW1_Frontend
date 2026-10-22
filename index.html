@@ -61,6 +61,7 @@
 
         <!-- LESSONS LANDING PAGE: one grid card per lesson using v-for -->
         <main v-else-if="currentPage === 'lessons'">
+            <br>
             <label for="filter">Filter lessons:</label>
             <select id="filter" v-model="selectedFilter">
                 <option value="All">All lessons</option>
@@ -68,22 +69,24 @@
                 <option value="Price < £30">Price under £30</option>
                 <option value="Price >= £30">Price £30 or more</option>
             </select>
+            <br>
 
             <label for="sortType">Sort lessons by:</label>
             <select id="sortType" v-model="sortType">
+                <option value="standard">Select an option</option>
                 <option value="price">Price</option>
                 <option value="availability">Available spaces</option>
                 <option value="location">Location</option>
                 <option value="subject">Subject</option>
             </select>
-
+            <br>
             <label>
                 <input type="checkbox" v-model="sortAscending">
                 Sort in increasing order
             </label>
             <div class="lesson-grid">
                 <div class="lesson-card" v-for="lesson in sortedLessons" v-bind:key="lesson.id">
-                    <img v-bind:src="'images/' + lesson.image" v-bind:alt="lesson.topic">
+                    <img v-bind:src="'http://localhost:3000/images/' + lesson.image" v-bind:alt="lesson.topic">
                     <h3>{{ lesson.topic }}</h3>
                     <p>Location: {{ lesson.location }}</p>
                     <p>Price: £{{ lesson.price }}</p>
@@ -101,7 +104,7 @@
 
         <section v-else-if="currentPage === 'lesson-details'" class="lesson-details">
             <div class="lesson-details" v-if="selectedLesson">
-                <img :src="'images/' + selectedLesson.image" :alt="selectedLesson.topic">
+                <img :src="'http://localhost:3000/images/' + selectedLesson.image" :alt="selectedLesson.topic">
                 <h2>{{ selectedLesson.topic }}</h2>
                 <p>£{{ selectedLesson.price }}</p>
                 <p>{{ selectedLesson.desc }}</p>
@@ -121,7 +124,7 @@
             <p v-if="cartCount === 0">Your cart is empty.</p>
             <div class="lesson-grid">
                 <div class="lesson-card" v-for="item in cartSummary" v-bind:key="item.lesson.id">
-                    <img v-bind:src="'images/' + item.lesson.image" v-bind:alt="item.lesson.topic">
+                    <img v-bind:src="'http://localhost:3000/images/' + item.lesson.image" v-bind:alt="item.lesson.topic">
                     <h3>{{ item.lesson.topic }}</h3>
                     <p>Location: {{ item.lesson.location }}</p>
                     <p>Price: £{{ item.lesson.price }}</p>
@@ -151,20 +154,20 @@
                 placeholder="123 Main Street, London, UK"></textarea>
             <h3>Order Total: £{{ cartSummary.reduce((total, item) => total + (item.lesson.price * item.quantity), 0) }}
             </h3>
-            <button :disabled="!isFormValid()" v-on:click="orderPlaced">Place Order</button>
-            <button v-on:click="currentPage = 'cart'">Back to Cart</button>
-            <button v-on:click="currentPage = 'lessons'">Continue Shopping</button>
+            <button :disabled="!isFormValid()" v-on:click="postOrder">Place Order</button>
+            <button v-on:click=" currentPage='cart'">Back to Cart</button>
+            <button v-on:click=" currentPage='lessons'">Continue Shopping</button>
         </section>
 
-        <section v-else-if="currentPage === 'confirmation'" class="confirmation">
-            <h2>Order Confirmed!</h2>
-            <p>Thank you for your order.</p>
-            <button v-on:click="currentPage = 'lessons'">
-                Continue Shopping
-            </button>
-            <button v-on:click="logout">
-                Logout
-            </button>
+        <section v-else-if=" currentPage==='confirmation'" class=" confirmation">
+                <h2>Order Confirmed!</h2>
+                <p>Thank you for your order.</p>
+                <button v-on:click="currentPage = 'lessons'">
+                    Continue Shopping
+                </button>
+                <button v-on:click="logout">
+                    Logout
+                </button>
         </section>
     </div>
 
@@ -177,7 +180,7 @@
                     filterOptions: ['All', 'Spaces Available', 'Price < £20', 'Price >= £20'],
                     selectedFilter: 'All',
 
-                    sortType: 'price',
+                    sortType: 'standard',
                     sortAscending: true,
 
 
@@ -304,10 +307,6 @@
                 // before anything on the details screen has been selected
                 // the same lesson can be added more than once (e.g. two children in the
                 // same class) until its spaces run out, then the button disables
-                orderPlaced() {
-                    this.cart = [],
-                        this.currentPage = 'confirmation'
-                },
                 isFormValid() {
                     return this.checkoutName.trim() !== '' &&
                         this.checkoutPhone.trim() !== '' &&
@@ -362,6 +361,33 @@
                         console.error("Error fetching lessons:", error);
                     }
                 },
+
+                async postOrder() {
+
+                    const orderData = {
+                        name: this.checkoutName,
+                        phone: this.checkoutPhone,
+                        address: this.checkoutAddress,
+                        lessonIds: this.cart.map(lesson => lesson.id)
+                    };
+
+                    try {
+                        const response = await fetch("http://localhost:3000/order", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify(orderData)
+                        });
+
+                        // Only clear the cart after the server accepts the order
+                        this.cart = [];
+                        this.currentPage = 'confirmation';
+
+                    } catch (error) {
+                        console.error("Error submitting order:", error);
+                    }
+                }
             }
         })
         myApp.mount('#app')
