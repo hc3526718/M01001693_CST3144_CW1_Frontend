@@ -20,9 +20,8 @@
             <h1>After School Classes</h1>
             <p v-if="isGuest">Browsing as guest</p>
             <p v-if="loggedInUser && isGuest === false">Logged in as {{ loggedInUser }}</p>
-            <i class="fa-solid fa-shopping-cart" v-bind:disabled="cartCount === 0"
-                v-on:click="currentPage = 'cart'"></i>
-            <span v-if="cartCount">({{ cartCount }})</span>
+            <i class="fa-solid fa-shopping-cart" v-if="cartCount > 0" v-on:click="currentPage = 'cart'"></i>
+            <span v-if="cartCount > 0">({{ cartCount }})</span>
             <button v-on:click="logout">Log out</button>
         </header>
 
@@ -62,28 +61,39 @@
         <!-- LESSONS LANDING PAGE: one grid card per lesson using v-for -->
         <main v-else-if="currentPage === 'lessons'">
             <br>
-            <label for="filter">Filter lessons:</label>
-            <select id="filter" v-model="selectedFilter">
-                <option value="All">All lessons</option>
-                <option value="Spaces Available">Spaces available</option>
-                <option value="Price < £30">Price under £30</option>
-                <option value="Price >= £30">Price £30 or more</option>
-            </select>
-            <br>
+            <div class="filter-sort">
+                <div>
+                    <label for="filter">Filter lessons:</label>
+                    <select id="filter" v-model="selectedFilter">
+                        <option value="All">All lessons</option>
+                        <option value="Spaces Available">Spaces available</option>
+                        <option value="Price < £30">Price under £30</option>
+                        <option value="Price >= £30">Price £30 or more</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="sortType">Sort lessons by:</label>
+                    <select id="sortType" v-model="sortType">
+                        <option value="standard">Select an option</option>
+                        <option value="price">Price</option>
+                        <option value="availability">Available spaces</option>
+                        <option value="location">Location</option>
+                        <option value="subject">Subject</option>
+                    </select>
+                </div>
+                <div>
+                    <label>
+                        <input type="checkbox" v-model="sortAscending">
+                        Sort in increasing order
+                    </label>
+                </div>
 
-            <label for="sortType">Sort lessons by:</label>
-            <select id="sortType" v-model="sortType">
-                <option value="standard">Select an option</option>
-                <option value="price">Price</option>
-                <option value="availability">Available spaces</option>
-                <option value="location">Location</option>
-                <option value="subject">Subject</option>
-            </select>
-            <br>
-            <label>
-                <input type="checkbox" v-model="sortAscending">
-                Sort in increasing order
-            </label>
+                <div class="lesson-search">
+                    <input type="text" id="lessonSearch" v-model="searchQuery"
+                        placeholder="Search for the name of the lesson/subject"
+                        aria-label="Search for the name of the lesson or subject">
+                </div>
+            </div>
             <div class="lesson-grid">
                 <div class="lesson-card" v-for="lesson in sortedLessons" v-bind:key="lesson.id">
                     <img v-bind:src="'http://localhost:3000/images/' + lesson.image" v-bind:alt="lesson.topic">
@@ -100,6 +110,11 @@
                     <p class="no-space" v-if="!canAddToCart(lesson)">No more space</p>
                 </div>
             </div>
+
+            <p v-if="sortedLessons.length === 0">
+                No lessons found. Try another lesson name or subject.
+            </p>
+
         </main>
 
         <section v-else-if="currentPage === 'lesson-details'" class="lesson-details">
@@ -124,7 +139,8 @@
             <p v-if="cartCount === 0">Your cart is empty.</p>
             <div class="lesson-grid">
                 <div class="lesson-card" v-for="item in cartSummary" v-bind:key="item.lesson.id">
-                    <img v-bind:src="'http://localhost:3000/images/' + item.lesson.image" v-bind:alt="item.lesson.topic">
+                    <img v-bind:src="'http://localhost:3000/images/' + item.lesson.image"
+                        v-bind:alt="item.lesson.topic">
                     <h3>{{ item.lesson.topic }}</h3>
                     <p>Location: {{ item.lesson.location }}</p>
                     <p>Price: £{{ item.lesson.price }}</p>
@@ -136,38 +152,40 @@
             </div>
             <h3 v-if="cartCount > 0">Total: £{{ cartSummary.reduce((total, item) => total + (item.lesson.price *
                 item.quantity), 0) }}</h3>
-            <button v-if="cartCount > 0" v-on:click="currentPage = 'checkout'">Proceed to Checkout</button>
+            <button v-if="cartCount > 0" id="checkout-button" v-on:click="checkoutFormVisible = true">Proceed to
+                Checkout</button>
             <button v-on:click="currentPage = 'lessons'">Continue Shopping</button>
-        </section>
-
-        <section v-else-if="currentPage === 'checkout'" class="checkout">
-            <h2>Checkout</h2>
-            <h4>Please enter your details to complete the order:</h4>
-            <h5>Name:</h5>
-            <textarea required v-model="checkoutName" class="form-control" placeholder="Joe Smith"></textarea>
-            <br>
-            <h5>Phone Number:</h5>
-            <textarea required v-model="checkoutPhone" class="form-control" placeholder="+44 123 456 7890"></textarea>
-            <br>
-            <h5>Address:</h5>
-            <textarea required v-model="checkoutAddress" class="form-control"
-                placeholder="123 Main Street, London, UK"></textarea>
-            <h3>Order Total: £{{ cartSummary.reduce((total, item) => total + (item.lesson.price * item.quantity), 0) }}
-            </h3>
-            <button :disabled="!isFormValid()" v-on:click="postOrder">Place Order</button>
-            <button v-on:click=" currentPage='cart'">Back to Cart</button>
-            <button v-on:click=" currentPage='lessons'">Continue Shopping</button>
+            <div v-if="checkoutFormVisible === true" class="checkout-form" id="checkout-form">
+                <h2>Checkout</h2>
+                <h4>Please enter your details to complete the order:</h4>
+                <h5>Name:</h5>
+                <textarea required v-model="checkoutName" class="form-control" placeholder="Joe Smith"></textarea>
+                <br>
+                <h5>Phone Number:</h5>
+                <textarea required v-model="checkoutPhone" class="form-control"
+                    placeholder="+44 123 456 7890"></textarea>
+                <br>
+                <h5>Address:</h5>
+                <textarea required v-model="checkoutAddress" class="form-control"
+                    placeholder="123 Main Street, London, UK"></textarea>
+                <h3>Order Total: £{{ cartSummary.reduce((total, item) => total + (item.lesson.price * item.quantity), 0)
+                    }}
+                </h3>
+                <button :disabled="!isFormValid()" v-on:click="postOrder">Place Order</button>
+                <button v-on:click=" checkoutFormVisible = false">Back to Cart</button>
+                <button v-on:click=" currentPage='lessons'">Continue Shopping</button>
+            </div>
         </section>
 
         <section v-else-if=" currentPage==='confirmation'" class=" confirmation">
-                <h2>Order Confirmed!</h2>
-                <p>Thank you for your order.</p>
-                <button v-on:click="currentPage = 'lessons'">
-                    Continue Shopping
-                </button>
-                <button v-on:click="logout">
-                    Logout
-                </button>
+            <h2>Order Confirmed!</h2>
+            <p>Thank you for your order.</p>
+            <button v-on:click="currentPage = 'lessons'">
+                Continue Shopping
+            </button>
+            <button v-on:click="logout">
+                Logout
+            </button>
         </section>
     </div>
 
@@ -176,7 +194,8 @@
         const myApp = createApp({
             data() {
                 return {
-
+                    searchQuery: '',
+                    checkoutFormVisible: false,
                     filterOptions: ['All', 'Spaces Available', 'Price < £20', 'Price >= £20'],
                     selectedFilter: 'All',
 
@@ -225,6 +244,14 @@
                 sortedLessons() {
                     // Start with a copy so we don't change the original lessons array.
                     let result = [...this.lessons];
+                    // Filter lessons by the name/subject entered in the search bar
+                    const search = this.searchQuery.trim().toLowerCase();
+
+                    if (search !== '') {
+                        result = result.filter(lesson =>
+                            lesson.topic.toLowerCase().includes(search)
+                        );
+                    }
 
                     // Apply the selected filter first.
                     if (this.selectedFilter === 'Spaces Available') {
@@ -307,6 +334,8 @@
                 // before anything on the details screen has been selected
                 // the same lesson can be added more than once (e.g. two children in the
                 // same class) until its spaces run out, then the button disables
+                checkoutFormVisible: false,
+
                 isFormValid() {
                     return this.checkoutName.trim() !== '' &&
                         this.checkoutPhone.trim() !== '' &&
