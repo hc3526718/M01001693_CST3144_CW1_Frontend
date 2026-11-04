@@ -177,7 +177,7 @@
             </div>
         </section>
 
-        <section v-else-if=" currentPage==='confirmation'" class=" confirmation">
+        <section v-else-if="currentPage === 'confirmation'" class="confirmation">
             <h2>Order Confirmed!</h2>
             <p>Thank you for your order.</p>
             <button v-on:click="currentPage = 'lessons'">
@@ -239,7 +239,6 @@
             computed: {
                 // returns the first problem with the register form, or '' when everything is valid
                 // (regexes reused from TradeOff script.js lines 293-294)
-                sortedLessonsList: [],
 
                 sortedLessons() {
                     // Start with a copy so we don't change the original lessons array.
@@ -273,7 +272,7 @@
                     const property = properties[this.sortType];
 
                     // Sort the lessons in increasing or decreasing order.
-                    result.sort((a, b) => {
+                    if (property) result.sort((a, b) => {
                         let comparison;
 
                         if (typeof a[property] === 'number') {
@@ -301,15 +300,6 @@
                     if (this.registerPassword !== this.registerConfirm) return 'Passwords do not match'
                     return ''
                 },
-                removeFromCart() {
-                    return (lesson) => {
-                        const index = this.cart.findIndex(item => item.id === lesson.id)
-                        if (index !== -1) {
-                            this.cart.splice(index, 1)
-                            lesson.space++
-                        }
-                    }
-                },
                 cartCount() {
                     return this.cart.length || 0
                 },
@@ -334,8 +324,6 @@
                 // before anything on the details screen has been selected
                 // the same lesson can be added more than once (e.g. two children in the
                 // same class) until its spaces run out, then the button disables
-                checkoutFormVisible: false,
-
                 isFormValid() {
                     return this.checkoutName.trim() !== '' &&
                         this.checkoutPhone.trim() !== '' &&
@@ -345,6 +333,13 @@
                     if (!this.canAddToCart(lesson)) return
                     this.cart.push(lesson)
                     lesson.space--
+                },
+                removeFromCart(lesson) {
+                    const index = this.cart.findIndex(item => item.id === lesson.id)
+                    if (index !== -1) {
+                        this.cart.splice(index, 1)
+                        lesson.space++
+                    }
                 },
                 canAddToCart(lesson) {
                     return lesson.space > 0
@@ -385,7 +380,11 @@
                             throw new Error("Failed to retrieve lessons");
                         }
 
-                        this.lessons = await response.json();
+                        const data = await response.json();
+                        this.lessons = data.map(lesson => ({
+                            ...lesson,
+                            space: Number(lesson.space ?? lesson.spaces ?? 0)
+                        }));
                     } catch (error) {
                         console.error("Error fetching lessons:", error);
                     }
@@ -397,8 +396,13 @@
                         name: this.checkoutName,
                         phone: this.checkoutPhone,
                         address: this.checkoutAddress,
-                        lessonIds: this.cart.map(lesson => lesson.id)
+                        lessonIDs: this.cartSummary.map(item => [item.lesson.id, item.quantity])
                     };
+
+                    console.log("Lesson IDs:", orderData.lessonIDs);
+                    orderData.lessonIDs.forEach((entry, index) => {
+                        console.log(`[${index}] Lesson ID: ${entry[0]}, Spaces: ${entry[1]}`);
+                    });
 
                     try {
                         const response = await fetch("http://localhost:3000/order", {
@@ -409,8 +413,25 @@
                             body: JSON.stringify(orderData)
                         });
 
+                        if (!response.ok) {
+                            throw new Error("Order failed");
+                        }
+
+                        await Promise.all(orderData.lessonIDs.map(entry =>
+                            fetch(`http://localhost:3000/lessons/${entry[0]}`, {
+                                method: "PUT",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ quantity: entry[1] })
+                            })
+                        ));
+                        await this.fetchLessons();
+
                         // Only clear the cart after the server accepts the order
                         this.cart = [];
+                        this.checkoutFormVisible = false;
+                        this.checkoutName = '';
+                        this.checkoutPhone = '';
+                        this.checkoutAddress = '';
                         this.currentPage = 'confirmation';
 
                     } catch (error) {
