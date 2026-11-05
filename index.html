@@ -13,7 +13,6 @@
 <body>
     <div id="app">
 
-        <!-- HEADER: shows who is using the app once they are past the welcome screens -->
         <header
             v-if="currentPage === 'lessons' || currentPage === 'lesson-details' || currentPage === 'cart' || currentPage === 'checkout' || currentPage === 'confirmation'">
             <i class="fa-solid fa-arrow-left" v-if="currentPage !== 'lessons'" v-on:click="currentPage = 'lessons'"></i>
@@ -25,7 +24,6 @@
             <button v-on:click="logout">Log out</button>
         </header>
 
-        <!-- WELCOME SCREEN: choose login, register or guest -->
         <section v-if="currentPage === 'welcome'" class="auth-box">
             <h1>Welcome to After School Classes</h1>
             <p>Book sports classes and activities near you.</p>
@@ -34,7 +32,6 @@
             <button v-on:click="continueAsGuest" class="secondary">Continue as Guest</button>
         </section>
 
-        <!-- LOGIN SCREEN -->
         <section v-else-if="currentPage === 'login'" class="auth-box">
             <h2>Welcome Back</h2>
             <input type="email" v-model="loginEmail" placeholder="Email">
@@ -45,11 +42,11 @@
             <a v-on:click="currentPage = 'welcome'">Back</a>
         </section>
 
-        <!-- REGISTER SCREEN: button stays disabled until the regex checks pass -->
         <section v-else-if="currentPage === 'register'" class="auth-box">
             <h2>Create Account</h2>
             <input type="text" v-model="registerName" placeholder="Name">
             <input type="email" v-model="registerEmail" placeholder="Email">
+            <input type="tel" v-model="registerPhone" placeholder="Phone Number">
             <input type="password" v-model="registerPassword" placeholder="Password">
             <input type="password" v-model="registerConfirm" placeholder="Confirm Password">
             <p class="hint" v-if="registerProblem">{{ registerProblem }}</p>
@@ -58,7 +55,6 @@
             <a v-on:click="currentPage = 'welcome'">Back</a>
         </section>
 
-        <!-- LESSONS LANDING PAGE: one grid card per lesson using v-for -->
         <main v-else-if="currentPage === 'lessons'">
             <br>
             <div class="filter-sort">
@@ -83,8 +79,12 @@
                 </div>
                 <div>
                     <label>
-                        <input type="checkbox" v-model="sortAscending">
-                        Sort in increasing order
+                        <input type="radio" name="sortOrder" v-bind:checked="sortAscending" v-on:change="setSortAscending">
+                        Increasing order
+                    </label>
+                    <label>
+                        <input type="radio" name="sortOrder" v-bind:checked="sortDescending" v-on:change="setSortDescending">
+                        Decreasing order
                     </label>
                 </div>
 
@@ -152,7 +152,7 @@
             </div>
             <h3 v-if="cartCount > 0">Total: £{{ cartSummary.reduce((total, item) => total + (item.lesson.price *
                 item.quantity), 0) }}</h3>
-            <button v-if="cartCount > 0" id="checkout-button" v-on:click="checkoutFormVisible = true">Proceed to
+            <button v-if="cartCount > 0" id="checkout-button" v-on:click="openCheckout">Proceed to
                 Checkout</button>
             <button v-on:click="currentPage = 'lessons'">Continue Shopping</button>
             <div v-if="checkoutFormVisible === true" class="checkout-form" id="checkout-form">
@@ -196,54 +196,36 @@
                 return {
                     searchQuery: '',
                     checkoutFormVisible: false,
-                    filterOptions: ['All', 'Spaces Available', 'Price < £20', 'Price >= £20'],
                     selectedFilter: 'All',
-
                     sortType: 'standard',
                     sortAscending: true,
-
-
-                    // which screen is showing: 'welcome', 'login', 'register', 'lessons', 'lesson-details' or 'cart'
+                    sortDescending: false,
                     currentPage: 'welcome',
                     isGuest: false,
                     loggedInUser: '',
                     cart: [],
-
-                    // the lesson opened with "View Lesson", used by the details screen
                     selectedLesson: null,
-
-                    // form fields (linked to the inputs with v-model)
                     loginEmail: '',
                     loginPassword: '',
                     loginError: '',
                     registerName: '',
                     registerEmail: '',
+                    registerPhone: '',
                     registerPassword: '',
                     registerConfirm: '',
-
+                    loggedInEmail: '',
                     checkoutName: '',
                     checkoutPhone: '',
                     checkoutAddress: '',
-
-                    // accounts created this session (front end only until the back end has user routes)
-                    users: [],
-
-                    // lesson data (will later come from GET /lessons on the back end)
                     lessons: [],
-
                 }
             },
             created() {
                 this.fetchLessons();
             },
             computed: {
-                // returns the first problem with the register form, or '' when everything is valid
-                // (regexes reused from TradeOff script.js lines 293-294)
-
                 sortedLessons() {
-                    // Start with a copy so we don't change the original lessons array.
                     let result = [...this.lessons];
-                    // Filter lessons by the name/subject entered in the search bar
                     const search = this.searchQuery.trim().toLowerCase();
 
                     if (search !== '') {
@@ -252,7 +234,6 @@
                         );
                     }
 
-                    // Apply the selected filter first.
                     if (this.selectedFilter === 'Spaces Available') {
                         result = result.filter(lesson => lesson.space > 0);
                     } else if (this.selectedFilter === 'Price < £30') {
@@ -261,7 +242,6 @@
                         result = result.filter(lesson => lesson.price >= 30);
                     }
 
-                    // Choose which lesson property to sort by.
                     const properties = {
                         price: 'price',
                         availability: 'space',
@@ -271,7 +251,6 @@
 
                     const property = properties[this.sortType];
 
-                    // Sort the lessons in increasing or decreasing order.
                     if (property) result.sort((a, b) => {
                         let comparison;
 
@@ -283,19 +262,23 @@
                             );
                         }
 
-                        return this.sortAscending ? comparison : -comparison;
+                        if (this.sortAscending) {
+                            return comparison;
+                        }
+                        return -comparison;
                     });
 
                     return result;
                 },
 
-
                 registerProblem() {
                     const nameRegex = /^[A-Za-z ]+$/
                     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+                    const phoneRegex = /^[0-9+()\-\s]{7,}$/
                     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{6,}$/
                     if (!nameRegex.test(this.registerName)) return 'Name must be letters only'
                     if (!emailRegex.test(this.registerEmail)) return 'Enter a valid email'
+                    if (!phoneRegex.test(this.registerPhone)) return 'Enter a valid phone number'
                     if (!passwordRegex.test(this.registerPassword)) return 'Password must be 6+ characters with upper, lower, number and special character'
                     if (this.registerPassword !== this.registerConfirm) return 'Passwords do not match'
                     return ''
@@ -303,8 +286,6 @@
                 cartCount() {
                     return this.cart.length || 0
                 },
-                // groups the cart by lesson so the same lesson added more than once
-                // shows as one line with a quantity instead of duplicate list items
                 cartSummary() {
                     const summary = []
                     this.cart.forEach(item => {
@@ -319,11 +300,14 @@
                 }
             },
             methods: {
-                // adds a lesson to the cart and takes one space off it
-                // the lesson is passed in by the button, so the grid cards work
-                // before anything on the details screen has been selected
-                // the same lesson can be added more than once (e.g. two children in the
-                // same class) until its spaces run out, then the button disables
+                setSortAscending() {
+                    this.sortAscending = true;
+                    this.sortDescending = false;
+                },
+                setSortDescending() {
+                    this.sortAscending = false;
+                    this.sortDescending = true;
+                },
                 isFormValid() {
                     return this.checkoutName.trim() !== '' &&
                         this.checkoutPhone.trim() !== '' &&
@@ -348,28 +332,88 @@
                     this.isGuest = true
                     this.currentPage = 'lessons'
                 },
-                register() {
-                    this.users.push({ name: this.registerName, email: this.registerEmail, password: this.registerPassword })
-                    this.loggedInUser = this.registerName
-                    this.isGuest = false
-                    this.currentPage = 'lessons'
-                },
-                login() {
-                    const user = this.users.find(u => u.email === this.loginEmail && u.password === this.loginPassword)
-                    if (!user) {
-                        this.loginError = 'Incorrect email or password'
-                        return
+                async register() {
+                    try {
+                        const response = await fetch("http://localhost:3000/users", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify({
+                                name: this.registerName,
+                                email: this.registerEmail,
+                                phone: this.registerPhone,
+                                password: this.registerPassword
+                            })
+                        });
+
+                        if (!response.ok) {
+                            throw new Error("Failed to register user");
+                        }
+
+                        this.loggedInUser = this.registerName;
+                        this.loggedInEmail = this.registerEmail;
+                        this.isGuest = false;
+                        this.currentPage = 'lessons';
+                    } catch (error) {
+                        console.error("Error registering user:", error);
                     }
-                    this.loginError = ''
-                    this.loggedInUser = user.name
-                    this.isGuest = false
-                    this.currentPage = 'lessons'
+                },
+                async login() {
+                    try {
+                        const response = await fetch("http://localhost:3000/users/" + encodeURIComponent(this.loginEmail));
+                        if (!response.ok) {
+                            this.loginError = 'Incorrect email or password';
+                            return;
+                        }
+
+                        const user = await response.json();
+                        if (user.password !== this.loginPassword) {
+                            this.loginError = 'Incorrect email or password';
+                            return;
+                        }
+
+                        this.loginError = '';
+                        this.loggedInUser = user.name;
+                        this.loggedInEmail = user.email || this.loginEmail;
+                        this.isGuest = false;
+                        this.currentPage = 'lessons';
+                    } catch (error) {
+                        console.error("Error fetching user:", error);
+                        this.loginError = 'Incorrect email or password';
+                    }
                 },
                 logout() {
                     this.isGuest = false
                     this.loggedInUser = ''
+                    this.loggedInEmail = ''
                     this.loginPassword = ''
+                    this.checkoutName = ''
+                    this.checkoutPhone = ''
                     this.currentPage = 'welcome'
+                },
+                async openCheckout() {
+                    this.checkoutFormVisible = true;
+
+                    if (this.isGuest || !this.loggedInEmail) {
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch(
+                            "http://localhost:3000/users/" + encodeURIComponent(this.loggedInEmail) + "/checkout"
+                        );
+
+                        if (!response.ok) {
+                            throw new Error("Failed to load checkout details");
+                        }
+
+                        const details = await response.json();
+                        this.checkoutName = details.name || '';
+                        this.checkoutPhone = details.phone || '';
+                    } catch (error) {
+                        console.error("Error loading checkout details:", error);
+                    }
                 },
 
                 async fetchLessons() {
@@ -383,6 +427,7 @@
                         const data = await response.json();
                         this.lessons = data.map(lesson => ({
                             ...lesson,
+                            id: lesson.id ?? lesson._id,
                             space: Number(lesson.space ?? lesson.spaces ?? 0)
                         }));
                     } catch (error) {
@@ -391,18 +436,14 @@
                 },
 
                 async postOrder() {
-
                     const orderData = {
                         name: this.checkoutName,
                         phone: this.checkoutPhone,
                         address: this.checkoutAddress,
-                        lessonIDs: this.cartSummary.map(item => [item.lesson.id, item.quantity])
+                        lessonIDs: this.cartSummary.map(item => [item.lesson.id, item.quantity, item.lesson.topic])
                     };
 
-                    console.log("Lesson IDs:", orderData.lessonIDs);
-                    orderData.lessonIDs.forEach((entry, index) => {
-                        console.log(`[${index}] Lesson ID: ${entry[0]}, Spaces: ${entry[1]}`);
-                    });
+                    console.log("Lessons ordered:", orderData.lessonIDs.map(entry => [entry[2], entry[1]]));
 
                     try {
                         const response = await fetch("http://localhost:3000/order", {
@@ -426,7 +467,6 @@
                         ));
                         await this.fetchLessons();
 
-                        // Only clear the cart after the server accepts the order
                         this.cart = [];
                         this.checkoutFormVisible = false;
                         this.checkoutName = '';
