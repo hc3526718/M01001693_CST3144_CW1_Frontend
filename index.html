@@ -168,7 +168,7 @@
                     </button>
                 </div>
             </div>
-            <h3 v-if="cartCount > 0">Total: £{{ cartTotal() }}</h3>
+            <h3 v-if="cartCount > 0">Total: £{{ cartTotal }}</h3>
             <button v-if="cartCount > 0" id="checkout-button" v-on:click="openCheckout">Proceed to
                 Checkout</button>
             <button v-on:click="currentPage = 'lessons'">Continue Shopping</button>
@@ -185,7 +185,7 @@
                 <h5>Address:</h5>
                 <textarea required v-model="checkoutAddress" class="form-control"
                     placeholder="123 Main Street, London, UK"></textarea>
-                <h3>Order Total: £{{ cartTotal() }}</h3>
+                <h3>Order Total: £{{ cartTotal }}</h3>
                 <p class="hint" v-if="isFormValid() !== ''">{{ isFormValid() }}</p>
                 <button v-on:click="postOrder" v-bind:disabled="!isFormValid() !== ''">Place Order</button>
                 <button v-on:click=" checkoutFormVisible = false">Back to Cart</button>
