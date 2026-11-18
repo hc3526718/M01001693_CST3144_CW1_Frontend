@@ -187,7 +187,7 @@
                     placeholder="123 Main Street, London, UK"></textarea>
                 <h3>Order Total: £{{ cartTotal }}</h3>
                 <p class="hint" v-if="isFormValid() !== ''">{{ isFormValid() }}</p>
-                <button v-on:click="postOrder" v-bind:disabled="!isFormValid() !== ''">Place Order</button>
+                <button v-on:click="postOrder" v-bind:disabled="isFormValid() !== ''">Place Order</button>
                 <button v-on:click=" checkoutFormVisible = false">Back to Cart</button>
                 <button v-on:click=" currentPage='lessons'">Continue Shopping</button>
             </div>
