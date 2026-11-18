@@ -189,6 +189,7 @@
                 <h3>Order Total: £{{ cartSummary.reduce((total, item) => total + (item.lesson.price * item.quantity), 0)
                     }}
                 </h3>
+                <p class="hint" v-if="isFormValid">{{ isFormValid() }}</p>
                 <button :disabled="!isFormValid()" v-on:click="postOrder">Place Order</button>
                 <button v-on:click=" checkoutFormVisible = false">Back to Cart</button>
                 <button v-on:click=" currentPage='lessons'">Continue Shopping</button>
@@ -337,9 +338,11 @@
                     this.sortDescending = true;
                 },
                 isFormValid() {
-                    return this.checkoutName.trim() !== '' &&
-                        this.checkoutPhone.trim() !== '' &&
-                        this.checkoutAddress.trim() !== ''
+                    const nameRegex = /^[A-Za-z ]+$/
+                    const phoneRegex = /^[0-9]+$/
+                    if (!nameRegex.test(this.checkoutName)) return 'Name must be letters only'
+                    if (!phoneRegex.test(this.checkoutPhone)) return 'Enter a valid phone number'
+                    return ''
                 },
                 addToCart(lesson) {
                     if (!this.canAddToCart(lesson)) return
