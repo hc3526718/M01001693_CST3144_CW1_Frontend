@@ -19,8 +19,9 @@
             <h1>After School Classes</h1>
             <p v-if="isGuest">Browsing as guest</p>
             <p v-if="loggedInUser && isGuest === false">Logged in as {{ loggedInUser }}</p>
-            <i class="fa-solid fa-shopping-cart" v-if="cartCount > 0" v-on:click="toggleCart"></i>
-            <span v-if="cartCount > 0">({{ cartCount }})</span>
+            <button v-on:click="toggleCart" v-bind:disabled="cartCount === 0">
+                <i class="fa-solid fa-shopping-cart"></i> ({{ cartCount }})
+            </button>
             <button v-on:click="logout">Log out</button>
         </header>
 
@@ -100,8 +101,8 @@
 
                 <div class="lesson-search">
                     <input type="text" id="lessonSearch" v-model="searchQuery"
-                        placeholder="Search for the name of the lesson/subject"
-                        aria-label="Search for the name of the lesson or subject">
+                        placeholder="Search by subject, location, price or spaces"
+                        aria-label="Search by subject, location, price or spaces">
                 </div>
             </div>
             <div class="lesson-grid">
@@ -123,7 +124,7 @@
             </div>
 
             <p v-if="sortedLessons.length === 0">
-                No lessons found. Try another lesson name or subject.
+                No lessons found. Try another search.
             </p>
 
         </main>
@@ -242,16 +243,14 @@
                 this.fetchLessons();
                 this.fetchTeachers();
             },
+            watch: {
+                searchQuery() {
+                    this.fetchLessons();
+                }
+            },
             computed: {
                 sortedLessons() {
                     let result = [...this.lessons];
-                    const search = this.searchQuery.trim().toLowerCase();
-
-                    if (search !== '') {
-                        result = result.filter(lesson =>
-                            lesson.location.toLowerCase().includes(search) || lesson.topic.toLowerCase().includes(search)
-                        );
-                    }
 
                     if (this.selectedFilter === 'Spaces Available') {
                         result = result.filter(lesson => lesson.space > 0);
@@ -348,15 +347,13 @@
                 },
                 isFormValid() {
                     const nameRegex = /^[A-Za-z ]+$/
-                    const phoneRegex = /^[0-9+()\-\s]+$/
-
-                    const phoneDigits = this.checkoutPhone.replace(/\D/g, '')
+                    const phoneRegex = /^[0-9]+$/
 
                     if (this.checkoutName.trim() === '') return 'Please enter your name'
                     if (!nameRegex.test(this.checkoutName.trim())) return 'Name must contain letters only'
                     if (this.checkoutPhone.trim() === '') return 'Please enter your phone number'
-                    if (!phoneRegex.test(this.checkoutPhone)) return 'Phone number contains invalid characters'
-                    if (phoneDigits.length < 11) return 'Phone number must contain at least 11 digits'
+                    if (!phoneRegex.test(this.checkoutPhone)) return 'Phone number must contain numbers only'
+                    if (this.checkoutPhone.length < 11) return 'Phone number must contain at least 11 digits'
                     if (this.checkoutAddress.trim() === '') return 'Please enter your address'
 
                     return ''
@@ -370,7 +367,9 @@
                     const index = this.cart.findIndex(item => item.id === lesson.id)
                     if (index !== -1) {
                         this.cart.splice(index, 1)
-                        lesson.space++
+                        const shown = this.lessons.find(item => item.id === lesson.id)
+                        if (shown) shown.space++
+                        if (shown !== lesson) lesson.space++
                     }
                 },
                 canAddToCart(lesson) {
@@ -467,18 +466,31 @@
 
                 async fetchLessons() {
                     try {
-                        const response = await fetch("https://m01001693-cst3144-cw1-backend.onrender.com/lessons");
+                        const search = this.searchQuery.trim();
+                        let url = "https://m01001693-cst3144-cw1-backend.onrender.com/lessons";
+                        if (search !== '') url += "?search=" + encodeURIComponent(search);
+                        const response = await fetch(url);
 
                         if (!response.ok) {
                             throw new Error("Failed to retrieve lessons");
                         }
 
                         const data = await response.json();
-                        this.lessons = data.map(lesson => ({
-                            ...lesson,
-                            id: lesson.id ?? lesson._id,
-                            space: Number(lesson.space ?? lesson.spaces ?? 0)
-                        }));
+                        this.lessons = data.map(lesson => {
+                            const id = lesson.id ?? lesson._id;
+                            const spacesInDb = Number(lesson.spaces ?? lesson.space ?? 0);
+                            const inCart = this.cart.filter(item => item.id === id).length;
+                            return {
+                                ...lesson,
+                                id: id,
+                                spacesInDb: spacesInDb,
+                                space: spacesInDb - inCart,
+                                teachers: (lesson.teachers ?? []).map(teacher => ({
+                                    ...teacher,
+                                    name: teacher.firstName + " " + teacher.lastName
+                                }))
+                            };
+                        });
                     } catch (error) {
                         console.error("Error fetching lessons:", error);
                     }
@@ -496,7 +508,7 @@
                         this.teachers = data.map(teacher => ({
                             ...teacher,
                             id: teacher.id ?? teacher._id,
-                            name: teacher.name ?? teacher.fullName,
+                            name: teacher.firstName + " " + teacher.lastName,
                             lessons: teacher.lessons ?? []
                         }));
                     } catch (error) {
@@ -513,7 +525,7 @@
                             lessonID: item.lesson.id,
                             lessonName: item.lesson.topic,
                             quantity: item.quantity,
-                            spacesRemaining: item.lesson.space
+                            spacesRemaining: item.lesson.spacesInDb - item.quantity
                         }))
                     };
 
@@ -537,7 +549,7 @@
                                 fetch(`https://m01001693-cst3144-cw1-backend.onrender.com/lessons/${entry.lessonID}`, {
                                     method: "PUT",
                                     headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ space: entry.spacesRemaining })
+                                    body: JSON.stringify({ spaces: entry.spacesRemaining })
                                 })
                             )
                         );
@@ -545,9 +557,9 @@
                         if (updateResponses.some(response => !response.ok)) {
                             throw new Error("Failed to update lesson spaces");
                         }
+                        this.cart = [];
                         await this.fetchLessons();
 
-                        this.cart = [];
                         this.checkoutFormVisible = false;
                         this.checkoutName = '';
                         this.checkoutPhone = '';
